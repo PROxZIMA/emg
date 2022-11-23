@@ -118,6 +118,13 @@
     font-weight: 600;
     text-decoration: none;
     border: 0;
+    max-width: 50%;
+    display: inline-block;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    direction: rtl;
+    vertical-align: bottom;
   }
 
   .emgithub-file .file-meta-light a {
