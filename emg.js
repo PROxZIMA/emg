@@ -37,7 +37,6 @@
   document.currentScript.insertAdjacentHTML(
     'afterend',
     `
-
 <style>
   .lds-ring {
     margin: 3rem auto;
@@ -80,9 +79,8 @@
       transform: rotate(360deg)
     }
   }
-</style>
 
-<style>
+
   .emgithub-file {
     border-radius: 6px;
     overflow: hidden;
@@ -136,9 +134,8 @@
       display: none;
     }
   }
-</style>
 
-<style>
+
   .emgithub-file .code-area {
     position: relative;
   }
@@ -233,9 +230,8 @@
   .emgithub-file .code-area .hide-line-numbers .hljs-ln-numbers {
     display: none;
   }
-</style>
 
-<style>
+
   .emgithub-file .html-area pre {
     padding: 0;
     background-color: #fff;
@@ -272,9 +268,26 @@
     padding: 45px;
   }
 
+  .emgithub-file .html-area.markdown-body .dataframe {
+    border: 0;
+  }
+
+  .emgithub-file .html-area.markdown-body .dataframe th,
+  .emgithub-file .html-area.markdown-body .dataframe td {
+    white-space: pre;
+  }
+
   /* Reserve space for "In [1]", "Out [1]" */
   .emgithub-file .html-area.markdown-body .nb-notebook {
     padding-left: 65px;
+  }
+
+  .emgithub-file .pdfViewer.removePageBorders .page {
+    margin: 0px !important;
+  }
+
+  .emgithub-file .pdfViewer.removePageBorders .page:not(:last-child) .canvasWrapper {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.3) !important;
   }
 
   @media (max-width: 767px) {
@@ -305,18 +318,20 @@
       ${type === 'markdown' || type === 'ipynb' ? `
       <div class="html-area markdown-body"></div>` : ''}
 
+      ${type === 'pdf' ? `
+      <div id="viewerContainer" class="html-area">
+        <div id="viewer" class="pdfViewer"></div>
+      </div>` : ''}
     </div>
 
     ${showFileMeta ? `<div class="file-meta file-meta-${isDarkStyle ? 'dark' : 'light'}"
       style="${showBorder ? '' : 'border:0'}">
       <a target="_blank" href="${rawFileURL}" style="float:right">view raw</a>
       <a target="_blank" href="${fileURL}">${decodeURIComponent(showFullPath ? filePath : pathSplit[pathSplit.length - 1])}</a>
-      delivered <span class="hide-in-phone">with ❤ </span>by <a target="_blank" href="${serviceProvider}">emgithub</a>
+      delivered <span class="hide-in-phone">with ❤ </span>by <a target="_blank" href="${serviceProvider}">PROxZIMA</a>
     </div>`: ''
     }
-
   </div>
-
 </div>
 
 `);
@@ -325,6 +340,9 @@
   const promises = [];
   const fetchFile = fetch(rawFileURL).then((response) => {
     if (response.ok) {
+      if (type === 'pdf') {
+        return response.blob();
+      }
       return response.text();
     } else {
       return Promise.reject(`${response.status}\nFailed to download ${rawFileURL}`);
@@ -379,6 +397,18 @@
         });
       promises.push(loadNotebookjs);
     }
+  }
+
+  if (type === 'pdf') {
+    const loadPdf = typeof Pdf != "undefined" ? Promise.resolve() : loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js');
+    const loadPdfViewer = typeof PdfViewer != "undefined" ? Promise.resolve() : loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf_viewer.min.js');
+    const loadPdfViewerStyle = fetch('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf_viewer.min.css')
+      .then((response) => response.text())
+      .then((text) => {
+        insertStyle(text);
+      });
+    const loadPdfjs = Promise.all([loadPdf, loadPdfViewer]);
+    promises.push(loadPdfjs);
   }
 
   // Do the happy embedding
@@ -451,6 +481,46 @@
         // catch either the file downloading error or notebook parsing error
         targetDiv.querySelector(".html-area").innerText = error.toString();
       }
+    } else if (type === 'pdf') {
+      try {
+        if (fetchSuccess) {
+          const container = document.getElementById("viewerContainer");
+          const eventBus = new pdfjsViewer.EventBus();
+
+          const pdfLinkService = new pdfjsViewer.PDFLinkService({
+            eventBus,
+            externalLinkTarget: 2
+          });
+
+          const pdfViewer = new pdfjsViewer.PDFViewer({
+            container,
+            eventBus,
+            removePageBorders: true,
+            linkService: pdfLinkService,
+          });
+
+          pdfLinkService.setViewer(pdfViewer);
+
+          eventBus.on("pagesinit", function () {
+            pdfViewer.currentScaleValue = "page-width";
+          });
+
+          const loadingTask = pdfjsLib.getDocument({
+            url: URL.createObjectURL(result[0].value),
+            enableXfa: true,
+          });
+          (async function () {
+            const pdfDocument = await loadingTask.promise;
+            pdfViewer.setDocument(pdfDocument);
+            pdfLinkService.setDocument(pdfDocument, null);
+          })();
+        } else {
+          throw result[0].reason;
+        }
+      } catch (error) {
+        // catch either the file downloading error or notebook parsing error
+        targetDiv.querySelector(".html-area").innerText = error.toString();
+      }
     }
 
     if (type === 'markdown' || type === 'ipynb') {
@@ -463,7 +533,7 @@
       });
 
       // Load Katex and KatexAutoRender after Notebookjs, to avoid the logic bug in https://github.com/jsvine/notebookjs/blob/02f0b451a0095f839c28b267c568f40694ad9362/notebook.js#L265-L273
-      // Specifically, in that code snippet, if `el.innerHTML` is assigned with something like `include <stdio.h>`, 
+      // Specifically, in that code snippet, if `el.innerHTML` is assigned with something like `include <stdio.h>`,
       // then the value read from `el.innerHTML` will be `include <stdio.h></stdio.h>`,
       // So if `#include <stdio.h>` is in a Markdown code block, wrong results will be rendered
       const loadKatex = typeof katex != "undefined" ? Promise.resolve() : loadScript('https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.js');
