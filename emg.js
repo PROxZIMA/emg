@@ -279,9 +279,9 @@
     border: 0;
   }
 
-  .emgithub-file .html-area.markdown-body .dataframe th,
-  .emgithub-file .html-area.markdown-body .dataframe td {
-    white-space: pre;
+  .emgithub-file .html-area.markdown-body .nb-notebook th,
+  .emgithub-file .html-area.markdown-body .nb-notebook td {
+    white-space: nowrap;
   }
 
   /* Reserve space for "In [1]", "Out [1]" */
