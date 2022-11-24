@@ -408,13 +408,16 @@
 
   if (type === 'pdf') {
     const loadPdf = typeof Pdf != "undefined" ? Promise.resolve() : loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js');
-    const loadPdfViewer = typeof PdfViewer != "undefined" ? Promise.resolve() : loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf_viewer.min.js');
     const loadPdfViewerStyle = fetch('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf_viewer.min.css')
       .then((response) => response.text())
       .then((text) => {
         insertStyle(text);
       });
-    const loadPdfjs = Promise.all([loadPdf, loadPdfViewer]);
+    const loadPdfjs = Promise.all([loadPdf])
+      .then(() => (typeof PdfViewer != "undefined" ? Promise.resolve() : loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf_viewer.min.js')))
+      .then(() => {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+      });
     promises.push(loadPdfjs);
   }
 
